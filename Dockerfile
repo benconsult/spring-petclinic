@@ -1,14 +1,26 @@
-# Not actually used by the devcontainer, but it is used by gitpod
-ARG VARIANT=17-bullseye
-FROM mcr.microsoft.com/vscode/devcontainers/java:0-${VARIANT}
-ARG NODE_VERSION="none"
-RUN if [ "${NODE_VERSION}" != "none" ]; then su vscode -c "umask 0002 && . /usr/local/share/nvm/nvm.sh && nvm install ${NODE_VERSION} 2>&1"; fi
-ARG USER=vscode
-VOLUME /home/$USER/.m2
-VOLUME /home/$USER/.gradle
-ARG JAVA_VERSION=17.0.7-ms
-RUN sudo mkdir /home/$USER/.m2 /home/$USER/.gradle && sudo chown $USER:$USER /home/$USER/.m2 /home/$USER/.gradle
-RUN bash -lc '. /usr/local/sdkman/bin/sdkman-init.sh && sdk install java $JAVA_VERSION && sdk use java $JAVA_VERSION'
+# Use an official OpenJDK base image
+FROM eclipse-temurin:17-jdk as builder
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the project files into the container
+COPY . .
+
+# Build the application using Maven Wrapper
+RUN ./mvnw package -DskipTests
+
+# Use a minimal JDK runtime image for the final container
+FROM eclipse-temurin:17-jre
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the built JAR file from the builder stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Expose the default Spring Boot port
 EXPOSE 8080
-ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app.war"]
+
+# Command to run the application
 CMD ["java", "-jar", "app.jar"]
